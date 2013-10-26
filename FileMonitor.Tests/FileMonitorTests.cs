@@ -64,6 +64,13 @@ namespace FileMonitor.Tests
 			Assert.That(signal.IsSet, Is.True);
 		}
 
+		[Test]
+		public void DisposeDoesNotThrow()
+		{
+			var monitor = new FileMonitor(this.file.FullName);
+			monitor.Dispose();
+		}
+
 		private void ResetFile()
 		{
 			using (var fs = File.Create(this.file.FullName)) { }
