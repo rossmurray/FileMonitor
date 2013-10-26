@@ -29,6 +29,8 @@ namespace FileMonitor
 		private object startStopLock;
 		private bool disposed;
 
+		public FileMonitor(string file, bool paused = false) : this(new FileInfo(file), paused) { }
+
 		public FileMonitor(FileInfo file, bool paused = false)
 		{
 			if (file == null) { throw new ArgumentNullException("file"); }

@@ -97,7 +97,13 @@ namespace FileMonitor
 
 		public void Dispose()
 		{
-			this.worker.Dispose();
+			lock (this.startStopLock)
+			{
+				if (this.isRunning)
+				{
+					Stop();
+				}
+			}
 			this.workloopSignal.Dispose();
 		}
 	}
