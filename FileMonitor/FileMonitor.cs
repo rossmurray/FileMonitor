@@ -12,48 +12,90 @@ namespace FileMonitor
 	/// </summary>
 	public class FileMonitor : IDisposable
 	{
+		/// <summary>
+		/// This event fires when the file being watched changes and is probably not in use by another process anymore.
+		/// </summary>
 		public event EventHandler<FileChangedEventArgs> FileChanged;
+		
+		/// <summary>
+		/// This event fires when there is an exception in the Task that attempts to open the file after it's changed.
+		/// </summary>
+		/// <remarks>Likely an UnauthorizedAccessException or SecurityException.</remarks>
+		public event EventHandler<AggregateExceptionArgs> OnException;
+
+		private FileInfo file;
 		private FileSystemWatcher watcher;
+		private FileChangeQueue changeQueue;
 		private object startStopLock;
 		private bool disposed;
 
-		public FileMonitor()
+		public FileMonitor(FileInfo file, bool paused = false)
 		{
+			if (file == null) { throw new ArgumentNullException("file"); }
+			this.file = file;
 			this.startStopLock = new object();
 			this.disposed = false;
 			this.watcher = new FileSystemWatcher();
+			this.changeQueue = new FileChangeQueue(file, NotifyChanged, NotifyOnException);
 			this.watcher.Changed += new FileSystemEventHandler(FileChangedHandler);
 			this.watcher.NotifyFilter = NotifyFilters.LastWrite;
-		}
-
-		public void Watch(FileInfo file)
-		{
-			if (disposed) { throw new ObjectDisposedException(this.GetType().Name); }
-			if (file == null) { throw new ArgumentNullException("file"); }
-			lock (this.startStopLock)
+			this.watcher.Path = file.DirectoryName;
+			this.watcher.Filter = file.Name;
+			if (!paused)
 			{
-				this.watcher.EnableRaisingEvents = false;
-				this.watcher.Path = file.DirectoryName;
-				this.watcher.Filter = file.Name;
 				this.watcher.EnableRaisingEvents = true;
+				this.changeQueue.Start();
 			}
 		}
 
-		public void StopWatching()
+		/// <summary>
+		/// Stops any changes to the file from being reported until Unpause is called.
+		/// </summary>
+		public void Pause()
 		{
 			if (disposed) { throw new ObjectDisposedException(this.GetType().Name); }
 			lock (this.startStopLock)
 			{
 				this.watcher.EnableRaisingEvents = false;
+				this.changeQueue.Stop();
+			}
+		}
+
+		/// <summary>
+		/// Resumes reporting changes after a previous call to Pause.
+		/// </summary>
+		public void Unpause()
+		{
+			if (disposed) { throw new ObjectDisposedException(this.GetType().Name); }
+			lock (this.startStopLock)
+			{
+				this.changeQueue.Start();
+				this.watcher.EnableRaisingEvents = true;
 			}
 		}
 
 		private void FileChangedHandler(object sender, FileSystemEventArgs e)
 		{
 			if (disposed) { return; }
-			throw new NotImplementedException();
-			//throw this event in a queue (another class) whose job is trying to open the file to determine it's done changing.
-			//inform event subscribers when the file is available.
+			this.changeQueue.QueueEvent();
+		}
+
+		private void NotifyChanged()
+		{
+			var handler = this.FileChanged;
+			if (handler != null)
+			{
+				handler(this, new FileChangedEventArgs() { File = this.file });
+			}
+		}
+
+		private void NotifyOnException(AggregateException obj)
+		{
+			var handler = this.OnException;
+			if (handler != null)
+			{
+				handler(this, new AggregateExceptionArgs() { Exception = obj });
+			}
 		}
 
 		public void Dispose()
@@ -68,6 +110,7 @@ namespace FileMonitor
 			{
 				this.watcher.Dispose();
 			}
+			this.changeQueue.Dispose();
 			this.disposed = true;
 		}
 	}

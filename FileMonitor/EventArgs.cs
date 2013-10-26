@@ -10,4 +10,9 @@ namespace FileMonitor
 	{
 		public FileInfo File { get; set; }
 	}
+
+	public class AggregateExceptionArgs : EventArgs
+	{
+		public AggregateException Exception { get; set; }
+	}
 }

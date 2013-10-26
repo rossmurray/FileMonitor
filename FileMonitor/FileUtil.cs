@@ -33,7 +33,7 @@ namespace FileMonitor
 					//it's feasible to examine HResult codes here and throw on codes other than sharing violations,
 					//but there are a lot of different reasons the file would be in used by something else
 					//such as locking only a portion of a file, open by another process, etc.
-					Thread.Sleep(300);
+					Thread.Sleep(200);
 				}
 			}
 			return false;
